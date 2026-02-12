@@ -7,6 +7,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.util.stream.Stream;
 import static io.restassured.RestAssured.*;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.not;
+
 public class TestChangeNamee {
 
     // метод createUser для создания пользователя, выполняется 1 раз перед всеми тестами
@@ -65,6 +67,15 @@ public class TestChangeNamee {
         .then()
                 .log().ifError()
                 .statusCode(200).assertThat().body("customer.name", equalTo(newName));
+        //Для проверки пока добавил гет запрос с ассертами внутри метода (потом будем выносить это для удобства)
+        given()
+                .baseUri("http://localhost:4111")
+                .basePath("/api/v1/customer/profile")
+                .auth().preemptive().basic("Test1234", "Test12345!")
+                .contentType(ContentType.JSON)
+        .when().get()
+        .then()
+                .statusCode(200).assertThat().body("name", equalTo(newName));
     }
 
     //Параметризованный тест на проверку невозможности изменения имени пользователя при невалидных данных.
@@ -82,6 +93,15 @@ public class TestChangeNamee {
         .then()
                 .log().ifError()
                 .statusCode(400);
+        //Проверяем, что имя не изменилось на невалидное
+        given()
+                .baseUri("http://localhost:4111")
+                .basePath("/api/v1/customer/profile")
+                .auth().preemptive().basic("Test1234", "Test12345!")
+                .contentType(ContentType.JSON)
+                .when().get()
+                .then()
+                .statusCode(200).assertThat().body("name", not(invalidName));
     }
 
     //Тест на проверку невозможности изменения имени пользователя без авторизации
@@ -96,5 +116,14 @@ public class TestChangeNamee {
                 .then()
                 .log().ifError()
                 .statusCode(401);
+
+        given()
+                .baseUri("http://localhost:4111")
+                .basePath("/api/v1/customer/profile")
+                .auth().preemptive().basic("Test1234", "Test12345!")
+                .contentType(ContentType.JSON)
+                .when().get()
+                .then()
+                .statusCode(200).assertThat().body("name", not("Some string"));
     }
 }
