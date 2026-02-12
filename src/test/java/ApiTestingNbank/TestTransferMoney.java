@@ -6,9 +6,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import java.util.stream.Stream;
 import static io.restassured.RestAssured.given;
-import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.*;
 
-public class TransferMoney {
+public class TestTransferMoney {
     private static int SENDER_ACCOUNT_ID;
     private static int RECEIVER_ACCOUNT_ID;
     private static int ZERO_BALANCE_ACCOUNT_ID;
@@ -140,6 +140,18 @@ public class TransferMoney {
                 .log().all()
                 .body("amount", equalTo(amount.floatValue()))
                 .statusCode(200);
+
+        //Проверка суммы перевода
+        given()
+                .baseUri("http://localhost:4111")
+                .basePath("/api/v1/accounts/" + SENDER_ACCOUNT_ID + "/transactions")
+                .auth().preemptive().basic("Test1234", "Test12345!")
+                .contentType(ContentType.JSON)
+                .when().get()
+                .then()
+                .statusCode(200)
+                .body("type", hasItem("TRANSFER_OUT"))
+                .body("amount", hasItem(amount.floatValue()));
     }
 
     // Проверка перевода с 1 аккаунта на 2 невалидные значения. Статус код 400
@@ -159,6 +171,17 @@ public class TransferMoney {
                 .then()
                 .log().body()
                 .statusCode(400);
+
+        //Проверка того, что невалидных значений нет в истории переводов
+        given()
+                .baseUri("http://localhost:4111")
+                .basePath("/api/v1/accounts/" + SENDER_ACCOUNT_ID + "/transactions")
+                .auth().preemptive().basic("Test1234", "Test12345!")
+                .contentType(ContentType.JSON)
+                .when().get()
+                .then()
+                .statusCode(200)
+                .body("amount", not(invalidAmount));
     }
 
     //Проверка невозможности перевода денег без авторизации - Статус код 401
@@ -171,11 +194,22 @@ public class TransferMoney {
                 .contentType(ContentType.JSON)
                 .body("{\"senderAccountId\": " + SENDER_ACCOUNT_ID +
                         ", \"receiverAccountId\": " + RECEIVER_ACCOUNT_ID +
-                        ", \"amount\": " + 3000 + "}")
+                        ", \"amount\": " + 3199 + "}")
                 .when().post()
                 .then()
                 .log().body()
                 .statusCode(401);
+
+        //Проверка того, что в истории переводов нет суммы, которая не должна передаваться без токена
+        given()
+                .baseUri("http://localhost:4111")
+                .basePath("/api/v1/accounts/" + SENDER_ACCOUNT_ID + "/transactions")
+                .auth().preemptive().basic("Test1234", "Test12345!")
+                .contentType(ContentType.JSON)
+                .when().get()
+                .then()
+                .statusCode(200)
+                .body("amount", not(3199));
     }
 
     //Проверка невозможности перевода валидного значения на невалидный id. Статус код 403
@@ -188,11 +222,22 @@ public class TransferMoney {
                 .contentType(ContentType.JSON)
                 .body("{\"senderAccountId\": " + 100 +
                         ", \"receiverAccountId\": " + RECEIVER_ACCOUNT_ID +
-                        ", \"amount\": " + 3000 + "}")
+                        ", \"amount\": " + 3198 + "}")
                 .when().post()
                 .then()
                 .log().body()
                 .statusCode(403);
+
+        //Проверка того, что в истории переводов нет суммы, которая не должна передаваться без токена
+        given()
+                .baseUri("http://localhost:4111")
+                .basePath("/api/v1/accounts/" + SENDER_ACCOUNT_ID + "/transactions")
+                .auth().preemptive().basic("Test1234", "Test12345!")
+                .contentType(ContentType.JSON)
+                .when().get()
+                .then()
+                .statusCode(200)
+                .body("amount", not(3198));
     }
 
     //Проверка невозможности перевода денег при 0 балансе у отправителя. Статус код 400
@@ -209,6 +254,17 @@ public class TransferMoney {
                 .when().post()
                 .then()
                 .statusCode(400);
+
+        //Проверка того, что в истории переводов нет суммы, которая не должна передаваться без токена
+        given()
+                .baseUri("http://localhost:4111")
+                .basePath("/api/v1/accounts/" + ZERO_BALANCE_ACCOUNT_ID + "/transactions")
+                .auth().preemptive().basic("Test1234", "Test12345!")
+                .contentType(ContentType.JSON)
+                .when().get()
+                .then()
+                .statusCode(200)
+                .body("amount", not(0.01));
     }
 
 }
