@@ -116,7 +116,7 @@ public class TestChangeNamee {
                 .then()
                 .log().ifError()
                 .statusCode(401);
-
+        //Проверяем, что имя не изменилось из-за отсутствия токена
         given()
                 .baseUri("http://localhost:4111")
                 .basePath("/api/v1/customer/profile")

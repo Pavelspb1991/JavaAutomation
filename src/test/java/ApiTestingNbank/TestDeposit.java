@@ -6,6 +6,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import java.util.stream.Stream;
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 public class TestDeposit {
 
@@ -83,7 +84,23 @@ public class TestDeposit {
         .when().post()
                 .then()
                 .log().ifError()
-                .statusCode(200);}
+                .statusCode(200);
+        // Проверка суммы депозита
+        given()
+                .baseUri("http://localhost:4111")
+                .basePath("/api/v1/accounts/1/transactions")
+                .auth().preemptive().basic("Test1234", "Test12345!")
+                .contentType(ContentType.JSON)
+                .when().get()
+                .then()
+                .statusCode(200)
+                .body("amount", hasItem(number.floatValue()))
+                .body("relatedAccountId", hasItem(1));
+
+
+    }
+
+
 
 
     //Проверка возможности депозита - невалидные значения. Статус код 400.
@@ -101,6 +118,18 @@ public class TestDeposit {
                 .then()
                 .log().ifError()
                 .statusCode(not(200));
+
+        // Проверка, что невалидных данных нет в массиве депозитов
+        given()
+                .baseUri("http://localhost:4111")
+                .basePath("/api/v1/accounts/1/transactions")
+                .auth().preemptive().basic("Test1234", "Test12345!")
+                .contentType(ContentType.JSON)
+                .when().get()
+                .then()
+                .statusCode(200)
+                .statusCode(200)
+                .body("amount", not(hasItem(object)));
     }
 
     //Проверка невозможности депозита без токена. Статус код 401
@@ -110,11 +139,22 @@ public class TestDeposit {
                 .baseUri("http://localhost:4111")
                 .basePath("/api/v1/accounts/deposit")
                 .contentType(ContentType.JSON)
-                .body("{\"id\": 1, \"balance\":5000}")
+                .body("{\"id\": 1, \"balance\":4988}") //захардкодил для уникальности
                 .when().post()
                 .then()
                 .log().ifError()
                 .statusCode(401);
+
+        // Проверка, что невалидных данных нет в массиве депозитов
+        given()
+                .baseUri("http://localhost:4111")
+                .basePath("/api/v1/accounts/1/transactions")
+                .auth().preemptive().basic("Test1234", "Test12345!")
+                .contentType(ContentType.JSON)
+                .when().get()
+                .then()
+                .statusCode(200)
+                .body("amount", not(hasItem(4988)));
     }
 
     //Проверка невозможности депозита с несуществующего аккаунта. Статус код 403
@@ -125,11 +165,22 @@ public class TestDeposit {
                 .basePath("/api/v1/accounts/deposit")
                 .contentType(ContentType.JSON)
                 .auth().preemptive().basic("Test1234", "Test12345!")
-                .body("{\"id\": 999, \"balance\":5000}")
+                .body("{\"id\": 999, \"balance\":4987}") //захардкодил для уникальности
         .when().post()
                 .then()
                 .log().ifError()
                 .statusCode(403);
+
+        // Проверка, что невалидных данных нет в массиве депозитов
+        given()
+                .baseUri("http://localhost:4111")
+                .basePath("/api/v1/accounts/1/transactions")
+                .auth().preemptive().basic("Test1234", "Test12345!")
+                .contentType(ContentType.JSON)
+                .when().get()
+                .then()
+                .statusCode(200)
+                .body("amount", not(hasItem(4987)));
     }
 
 }
