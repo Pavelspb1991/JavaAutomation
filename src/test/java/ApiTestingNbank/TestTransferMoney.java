@@ -1,95 +1,46 @@
 package ApiTestingNbank;
-import io.restassured.http.ContentType;
+import models.*;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import requests.CreateNewAccountRequester;
+import requests.DepositMoneyRequester;
+import requests.GetCustomerProfileRequester;
+import requests.TransferMoneyRequester;
+import specs.RequestSpecs;
+import specs.ResponseSpecs;
 import java.util.stream.Stream;
-import static io.restassured.RestAssured.given;
-import static org.hamcrest.Matchers.*;
 
-public class TestTransferMoney {
-    private static int SENDER_ACCOUNT_ID;
-    private static int RECEIVER_ACCOUNT_ID;
-    private static int ZERO_BALANCE_ACCOUNT_ID;
+public class TestTransferMoney extends BaseTest{
+    public static CreateAccountResponse createAccountResponse;
+    public static CreateAccountResponse createAccountResponseReceiver;
+    public static CreateAccountResponse createAccountResponseZeroBalance;
 
-    // Метод setup, объединил два метода (создать юзера + создать два аккаунта для трансфера + депозит),
-    // так как если создать две аннотации beforeAll, то нет последовательности и тесты падают с 401
+    //Создаем три аккаунта для юзера и добавляем сумму на баланс с depositToAccount()
     @BeforeAll
-    public static void setup() throws InterruptedException {
-        // 1. Создаем пользователя
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/admin/users")
-                .contentType(ContentType.JSON)
-                .auth().preemptive().basic("admin", "admin")
-                .body("""
-                        {
-                            "username": "Test1234",
-                            "password": "Test12345!",
-                            "role": "USER"
-                        }
-                        """)
-                .when().post()
-                .then()
-                .statusCode(201).log().body();
+    public static void setup() {
+        String username = createdUserRequest.getUsername();
+        String password = createdUserRequest.getPassword();
+        createAccountResponse = new CreateNewAccountRequester(RequestSpecs.userSpec(username,password),
+                ResponseSpecs.entityWasCreated()).post().extract().as(CreateAccountResponse.class);
+        createAccountResponseReceiver = new CreateNewAccountRequester(RequestSpecs.userSpec(username,password),
+                ResponseSpecs.entityWasCreated()).post().extract().as(CreateAccountResponse.class);
+        createAccountResponseZeroBalance = new CreateNewAccountRequester(RequestSpecs.userSpec(username,password),
+                ResponseSpecs.entityWasCreated()).post().extract().as(CreateAccountResponse.class);
 
-        Thread.sleep(2000);
-
-        //Создаем аккаунт 1, с которого будем совершать переводы
-        int senderAccountId = given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts")
-                .contentType(ContentType.JSON)
-                .auth().preemptive().basic("Test1234", "Test12345!")
-                .when().post()
-                .then()
-                .statusCode(201).log().body()
-                .extract()
-                .path("id");
-
-        //Создаем аккаунт 2, на этот аккаунт будет совершать переводы
-        int receiverAccountId = given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts")
-                .contentType(ContentType.JSON)
-                .auth().preemptive().basic("Test1234", "Test12345!")
-                .when().post()
-                .then()
-                .statusCode(201).log().body()
-                .extract()
-                .path("id");
-        Thread.sleep(2000);
-
-        //Создаем аккаунт 3 с пустым балансом
-        int zeroBalanceAccountId = given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts")
-                .contentType(ContentType.JSON)
-                .auth().preemptive().basic("Test1234", "Test12345!")
-                .when().post()
-                .then()
-                .statusCode(201).log().body()
-                .extract()
-                .path("id");
-        Thread.sleep(2000);
-
-        SENDER_ACCOUNT_ID = senderAccountId;
-        RECEIVER_ACCOUNT_ID = receiverAccountId;
-        ZERO_BALANCE_ACCOUNT_ID = zeroBalanceAccountId;
-
-        //Пополнение депозита для тестовых переводов
-        for (int i = 0; i < 10; i++) {
-            given()
-                    .baseUri("http://localhost:4111")
-                    .basePath("/api/v1/accounts/deposit")
-                    .auth().preemptive().basic("Test1234", "Test12345!")
-                    .contentType(ContentType.JSON)
-                    .body("{\"id\": " + SENDER_ACCOUNT_ID + ", \"balance\": " + 5000 + "}")
-                    .when().post()
-                    .then();
+        for(int i=0; i < 10;i++) {
+            depositToAccount(createAccountResponse.getId(), 5000);
         }
-        Thread.sleep(2000);
+    }
+
+    //Вспомогательный метод, вызывается в beforeAll. Добавляет необходимую сумму баланса для перевода
+    private static void depositToAccount(int accountId, Number amount) {
+        String username = createdUserRequest.getUsername();
+        String password = createdUserRequest.getPassword();
+
+        DepositMoneyRequest request = DepositMoneyRequest.builder().id(accountId).balance(amount).build();
+        new DepositMoneyRequester(RequestSpecs.userSpec(username, password), ResponseSpecs.ok()).post(request);
     }
 
     // Метод для генерации валидных значений транзакции
@@ -122,36 +73,87 @@ public class TestTransferMoney {
                 1000000000);
     }
 
+    private String formatJsonValue(Object value) {
+        return switch (value) {
+            case null -> "null";
+            case String string ->
+                    "\"" + value + "\"";
+            case Boolean b -> value.toString();
+            case Number number -> value.toString();
+            default ->
+                    "\"" + value.toString() + "\"";
+        };
+    }
+
     // Проверка перевода с 1 аккаунта на 2 - валидные значения. Статус код 200. Источник входных данных -
     // @MethodSource("validTransferAmount")
     @ParameterizedTest
     @MethodSource("validTransferAmount")
     public void userCanTransferAmountValidData(Number amount) {
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts/transfer")
-                .auth().preemptive().basic("Test1234", "Test12345!")
-                .contentType(ContentType.JSON)
-                .body("{\"senderAccountId\": " + SENDER_ACCOUNT_ID +
-                        ", \"receiverAccountId\": " + RECEIVER_ACCOUNT_ID +
-                        ", \"amount\": " + amount + "}")
-                .when().post()
-                .then()
-                .log().all()
-                .body("amount", equalTo(amount.floatValue()))
-                .statusCode(200);
+        //Извлекаем логин и пароль из запроса на создание юзера
+        String username = createdUserRequest.getUsername();
+        String password = createdUserRequest.getPassword();
 
-        //Проверка суммы перевода
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts/" + SENDER_ACCOUNT_ID + "/transactions")
-                .auth().preemptive().basic("Test1234", "Test12345!")
-                .contentType(ContentType.JSON)
-                .when().get()
-                .then()
-                .statusCode(200)
-                .body("type", hasItem("TRANSFER_OUT"))
-                .body("amount", hasItem(amount.floatValue()));
+        //Отправляем get запрос для проверки
+        CustomerData beforeData = new GetCustomerProfileRequester(RequestSpecs.userSpec(username,password),
+                ResponseSpecs.ok()).get().extract().as(CustomerData.class);
+
+        //Извлекаем нужный для теста аккаунт получателя до перевода
+        Account receiverAccount = beforeData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponseReceiver.getId())
+                .findFirst()
+                .orElseThrow();
+
+        //Извлекаем баланс аккаунта 2 до перевода
+        Number receiverAccountBalance = receiverAccount.getBalance();
+
+        //Извлекаем нужный для теста аккаунт отправителя после перевода
+        Account senderBefore = beforeData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponse.getId())
+                .findFirst()
+                .orElseThrow();
+
+        //Извлекаем баланс аккаунта 1 (отправителя) до перевода
+        Number senderBalanceBefore = senderBefore.getBalance();
+
+        //Создаем тело для post-запроса
+        TransferMoneyRequest request = TransferMoneyRequest.builder().senderAccountId(createAccountResponse.getId())
+                .receiverAccountId(createAccountResponseReceiver.getId()).amount(amount)
+                .build();
+
+        //Отправляем post-запрос
+        TransferMoneyResponse response = new TransferMoneyRequester(RequestSpecs.userSpec(username,password),
+                ResponseSpecs.ok()).post(request).extract().as(TransferMoneyResponse.class);
+
+        //Отправляем get запрос для проверки
+        CustomerData afterData = new GetCustomerProfileRequester(RequestSpecs.userSpec(username,password),
+                ResponseSpecs.ok()).get().extract().as(CustomerData.class);
+
+        //Извлекаем нужный для теста аккаунт получателя после перевода
+        Account receiverAccountAfter = afterData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponseReceiver.getId())
+                .findFirst()
+                .orElseThrow();
+
+        //Извлекаем нужный для теста аккаунт отправителя после перевода
+        Account senderAfter = afterData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponse.getId())
+                .findFirst()
+                .orElseThrow();
+
+        //Проверки тела ответа
+        softly.assertThat(response.getSenderAccountId()).isEqualTo(request.getSenderAccountId());
+        softly.assertThat(response.getReceiverAccountId()).isEqualTo(request.getReceiverAccountId());
+        softly.assertThat(response.getAmount()).isEqualTo(request.getAmount().doubleValue());
+        softly.assertThat(response.getMessage()).isEqualTo(SuccessMessages.TRANSFER_SUCCESSFUL);
+
+        //Проверка, что баланс у аккаунта получателя изменился на сумму перевода
+        softly.assertThat(receiverAccountAfter.getBalance().doubleValue())
+                .isEqualTo(receiverAccountBalance.doubleValue() + amount.doubleValue());
+
+        //Проверка, что баланс у аккаунта отправителя изменился на сумму перевода
+        softly.assertThat(senderAfter.getBalance().doubleValue())
+                .isEqualTo(senderBalanceBefore.doubleValue() - amount.doubleValue());
     }
 
     // Проверка перевода с 1 аккаунта на 2 невалидные значения. Статус код 400
@@ -159,115 +161,189 @@ public class TestTransferMoney {
     @ParameterizedTest
     @MethodSource("invalidTransferAmount")
     public void userCantTransferAmountInvalidData(Object invalidAmount) {
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts/transfer")
-                .auth().preemptive().basic("Test1234", "Test12345!")
-                .contentType(ContentType.JSON)
-                .body("{\"senderAccountId\": " + SENDER_ACCOUNT_ID +
-                        ", \"receiverAccountId\": " + RECEIVER_ACCOUNT_ID +
-                        ", \"amount\": " + invalidAmount + "}")
-                .when().post()
-                .then()
-                .log().body()
-                .statusCode(400);
+        //Извлекаем логин и пароль из запроса на создание юзера
+        String username = createdUserRequest.getUsername();
+        String password = createdUserRequest.getPassword();
 
-        //Проверка того, что невалидных значений нет в истории переводов
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts/" + SENDER_ACCOUNT_ID + "/transactions")
-                .auth().preemptive().basic("Test1234", "Test12345!")
-                .contentType(ContentType.JSON)
-                .when().get()
-                .then()
-                .statusCode(200)
-                .body("amount", not(invalidAmount));
+        //Отправляем get запрос для проверки
+        CustomerData beforeData = new GetCustomerProfileRequester(RequestSpecs.userSpec(username,password),
+                ResponseSpecs.ok()).get().extract().as(CustomerData.class);
+
+        //Извлекаем нужный для теста аккаунт до перевода
+        Account receiverAccount = beforeData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponseReceiver.getId())
+                .findFirst()
+                .orElseThrow();
+
+        //Извлекаем баланс до пополнения депозита
+        Number receiverAccountBalance = receiverAccount.getBalance();
+
+        //Формируем сырой json через String.format, тк pojo-класс не может этого сделать
+        String jsonBody = String.format(
+                "{\"senderAccountId\": %d,\"receiverAccountId\": %d, \"amount\": %s}",
+                createAccountResponse.getId(),
+                createAccountResponseReceiver.getId(),
+                formatJsonValue(invalidAmount));
+
+        //Отправляем post-запрос
+        new TransferMoneyRequester(RequestSpecs.userSpec(username,password), ResponseSpecs.invalidDataProvided())
+                .post(jsonBody);
+
+        //Отправляем get-запрос после перевода
+        CustomerData afterData = new GetCustomerProfileRequester(RequestSpecs.userSpec(username, password),
+                ResponseSpecs.ok()).get().extract().as(CustomerData.class);
+
+        //Извлекаем нужный для теста после перевода
+        Account receiverAccountAfter = afterData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponseReceiver.getId())
+                .findFirst()
+                .orElseThrow();
+
+        //Проверка, что баланс у аккаунта 2 не изменился
+        softly.assertThat(receiverAccountAfter.getBalance().doubleValue())
+                .isEqualTo(receiverAccountBalance.doubleValue());
     }
 
     //Проверка невозможности перевода денег без авторизации - Статус код 401
     @Test
     public void userCantDepositMoneyWithoutToken() {
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts/transfer")
-                .contentType(ContentType.JSON)
-                .contentType(ContentType.JSON)
-                .body("{\"senderAccountId\": " + SENDER_ACCOUNT_ID +
-                        ", \"receiverAccountId\": " + RECEIVER_ACCOUNT_ID +
-                        ", \"amount\": " + 3199 + "}")
-                .when().post()
-                .then()
-                .log().body()
-                .statusCode(401);
+        //Извлекаем логин и пароль из запроса на создание юзера
+        String username = createdUserRequest.getUsername();
+        String password = createdUserRequest.getPassword();
 
-        //Проверка того, что в истории переводов нет суммы, которая не должна передаваться без токена
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts/" + SENDER_ACCOUNT_ID + "/transactions")
-                .auth().preemptive().basic("Test1234", "Test12345!")
-                .contentType(ContentType.JSON)
-                .when().get()
-                .then()
-                .statusCode(200)
-                .body("amount", not(3199));
+        //Отправляем get запрос для проверки
+        CustomerData beforeData = new GetCustomerProfileRequester(RequestSpecs.userSpec(username,password),
+                ResponseSpecs.ok()).get().extract().as(CustomerData.class);
+
+        //Извлекаем нужный для теста аккаунт до перевода
+        Account receiverAccount = beforeData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponseReceiver.getId())
+                .findFirst()
+                .orElseThrow();
+
+        //Извлекаем баланс до пополнения депозита
+        Number receiverAccountBalance = receiverAccount.getBalance();
+
+        //Формируем тело для post-запроса
+        TransferMoneyRequest request = TransferMoneyRequest.builder()
+                .senderAccountId(createAccountResponse.getId())
+                .receiverAccountId(createAccountResponseReceiver.getId())
+                .amount(1000).build();
+
+        //Отправляем post-запрос
+        new TransferMoneyRequester(RequestSpecs.unauthSpec(),ResponseSpecs.invalidToken()).post(request);
+
+        //Отправляем get-запрос после перевода
+        CustomerData afterData = new GetCustomerProfileRequester(RequestSpecs.userSpec(username, password),
+                ResponseSpecs.ok()).get().extract().as(CustomerData.class);
+
+        //Извлекаем нужный для теста после перевода
+        Account receiverAccountAfter = afterData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponseReceiver.getId())
+                .findFirst()
+                .orElseThrow();
+
+
+        softly.assertThat(receiverAccountAfter.getBalance().doubleValue())
+                .isEqualTo(receiverAccountBalance.doubleValue());
     }
 
     //Проверка невозможности перевода валидного значения на невалидный id. Статус код 403
     @Test
-    public void userCantTransferAmountInvalidId() {
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts/transfer")
-                .auth().preemptive().basic("Test1234", "Test12345!")
-                .contentType(ContentType.JSON)
-                .body("{\"senderAccountId\": " + 100 +
-                        ", \"receiverAccountId\": " + RECEIVER_ACCOUNT_ID +
-                        ", \"amount\": " + 3198 + "}")
-                .when().post()
-                .then()
-                .log().body()
-                .statusCode(403);
+    public void userCantTransferAmountInvalidId() { //Извлекаем логин и пароль из запроса на создание юзера
+        String username = createdUserRequest.getUsername();
+        String password = createdUserRequest.getPassword();
 
-        //Проверка того, что в истории переводов нет суммы, которая не должна передаваться без токена
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts/" + SENDER_ACCOUNT_ID + "/transactions")
-                .auth().preemptive().basic("Test1234", "Test12345!")
-                .contentType(ContentType.JSON)
-                .when().get()
-                .then()
-                .statusCode(200)
-                .body("amount", not(3198));
+        //Отправляем get запрос для проверки
+        CustomerData beforeData = new GetCustomerProfileRequester(RequestSpecs.userSpec(username, password),
+                ResponseSpecs.ok()).get().extract().as(CustomerData.class);
+
+        //Извлекаем нужный для теста аккаунт до перевода
+        Account receiverAccount = beforeData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponseReceiver.getId())
+                .findFirst()
+                .orElseThrow();
+
+        //Извлекаем баланс до пополнения депозита
+        Number receiverAccountBalance = receiverAccount.getBalance();
+
+        //Формируем тело для post-запроса
+        TransferMoneyRequest request = TransferMoneyRequest.builder()
+                .senderAccountId(createAccountResponse.getId() + 100)
+                .receiverAccountId(createAccountResponseReceiver.getId())
+                .amount(1000).build();
+
+        //Отправляем post-запрос
+        new TransferMoneyRequester(RequestSpecs.userSpec(username, password), ResponseSpecs.invalidIdAccount())
+                .post(request);
+
+        //Отправляем get-запрос после перевода
+        CustomerData afterData = new GetCustomerProfileRequester(RequestSpecs.userSpec(username, password),
+                ResponseSpecs.ok()).get().extract().as(CustomerData.class);
+
+        //Извлекаем нужный для теста после перевода
+        Account receiverAccountAfter = afterData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponseReceiver.getId())
+                .findFirst()
+                .orElseThrow();
+
+        softly.assertThat(receiverAccountAfter.getBalance().doubleValue())
+                .isEqualTo(receiverAccountBalance.doubleValue());
     }
 
     //Проверка невозможности перевода денег при 0 балансе у отправителя. Статус код 400
     @Test
     public void userCantTransferWithZeroBalanceAmount() {
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts/transfer")
-                .auth().preemptive().basic("Test1234", "Test12345!")
-                .contentType(ContentType.JSON)
-                .body("{\"senderAccountId\": " + ZERO_BALANCE_ACCOUNT_ID +
-                        ", \"receiverAccountId\": " + RECEIVER_ACCOUNT_ID +
-                        ", \"amount\": " + 0.01 + "}")
-                .when().post()
-                .then()
-                .statusCode(400);
+        //Извлекаем логин и пароль из запроса на создание юзера
+        String username = createdUserRequest.getUsername();
+        String password = createdUserRequest.getPassword();
 
-        //Проверка того, что в истории переводов нет суммы, которая не должна передаваться без токена
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts/" + ZERO_BALANCE_ACCOUNT_ID + "/transactions")
-                .auth().preemptive().basic("Test1234", "Test12345!")
-                .contentType(ContentType.JSON)
-                .when().get()
-                .then()
-                .statusCode(200)
-                .body("amount", not(0.01));
+        //Отправляем get запрос для проверки
+        CustomerData beforeData = new GetCustomerProfileRequester(RequestSpecs.userSpec(username,password),
+                ResponseSpecs.ok()).get().extract().as(CustomerData.class);
+
+        //Извлекаем нужный для теста аккаунт получателя до перевода
+        Account receiverAccount = beforeData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponseReceiver.getId())
+                .findFirst()
+                .orElseThrow();
+
+        //Извлекаем баланс аккаунта 2 до перевода
+        Number receiverAccountBalance = receiverAccount.getBalance();
+
+
+        //Создаем тело для post-запроса
+        TransferMoneyRequest request = TransferMoneyRequest.builder()
+                .senderAccountId(createAccountResponseZeroBalance.getId())
+                .receiverAccountId(createAccountResponseReceiver.getId()).amount(0.1)
+                .build();
+
+        //Отправляем post-запрос
+        new TransferMoneyRequester(RequestSpecs.userSpec(username,password),
+                ResponseSpecs.invalidDataProvided()).post(request);
+
+        //Отправляем get запрос для проверки
+        CustomerData afterData = new GetCustomerProfileRequester(RequestSpecs.userSpec(username,password),
+                ResponseSpecs.ok()).get().extract().as(CustomerData.class);
+
+        //Извлекаем нужный для теста аккаунт получателя после перевода
+        Account receiverAccountAfter = afterData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponseReceiver.getId())
+                .findFirst()
+                .orElseThrow();
+
+        //Извлекаем нужный для теста аккаунт отправителя после перевода
+        Account senderAfter = afterData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponseZeroBalance.getId())
+                .findFirst()
+                .orElseThrow();
+
+        //Проверка, что баланс получателя не изменился
+        softly.assertThat(receiverAccountAfter.getBalance().doubleValue())
+                .isEqualTo(receiverAccountBalance.doubleValue());
+
+        //Проверка, что баланс у аккаунта отправителя не изменился на сумму перевода и равен 0
+        softly.assertThat(senderAfter.getBalance().doubleValue())
+                .isEqualTo(0.0);
     }
-
 }
-
-
-

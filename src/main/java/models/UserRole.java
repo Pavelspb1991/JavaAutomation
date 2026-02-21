@@ -1,4 +1,6 @@
 package models;
 
-public class UserRole {
+public enum UserRole {
+    USER,
+    ADMIN
 }

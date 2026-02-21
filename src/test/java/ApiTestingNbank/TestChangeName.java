@@ -10,8 +10,7 @@ import specs.RequestSpecs;
 import specs.ResponseSpecs;
 import java.util.stream.Stream;
 
-
-public class TestChangeNamee extends BaseTest {
+public class TestChangeName extends BaseTest {
 
     // Метод, который возвращает стрим валидных значений
     static Stream<String> validNames() {
@@ -49,6 +48,7 @@ public class TestChangeNamee extends BaseTest {
         // Проверяем значение поля name
         softly.assertThat(request.getName())
                 .isEqualTo(updateCustomerProfileResponse.getCustomer().getName());
+
         //Отправляем GET запрос и записываем результат в getResponse
         CustomerData getResponse = new
                 GetCustomerProfileRequester(RequestSpecs.userSpec(username,password), ResponseSpecs.ok())
@@ -58,9 +58,6 @@ public class TestChangeNamee extends BaseTest {
                 .isEqualTo(newName);
         }
 
-
-
-
     //Параметризованный тест на проверку невозможности изменения имени пользователя при невалидных данных.
     //Источник входных данных - @MethodSource("invalidNames")
     @ParameterizedTest
@@ -68,6 +65,7 @@ public class TestChangeNamee extends BaseTest {
     public void userCantChangeNameWithInvalidData(String invalidName) {
         //получаем данные пользователя с метода createUser, который в BeforeAll создает его перед тестами (класс BaseTest)
         String username = createdUserRequest.getUsername();
+
         String password = createdUserRequest.getPassword();
         //Создаем тело запроса для метода put
         UpdateCustomerProfileRequest badRequest = UpdateCustomerProfileRequest.builder().name(invalidName).build();
@@ -76,7 +74,8 @@ public class TestChangeNamee extends BaseTest {
                 RequestSpecs.userSpec(username,password), ResponseSpecs.invalidDataProvided()).put(badRequest)
                 .extract().asString();
         //Проверяем текст сообщения об ошибке
-        softly.assertThat(errorMessage.equals(ErrorMessages.INVALID_NAME));
+        softly.assertThat(errorMessage).isEqualTo(ErrorMessages.INVALID_NAME);
+
         //Отправляем GET запрос и записываем результат в getResponse
         CustomerData getResponse = new
                 GetCustomerProfileRequester(RequestSpecs.userSpec(username,password), ResponseSpecs.ok())
@@ -84,9 +83,8 @@ public class TestChangeNamee extends BaseTest {
         // Проверяем, что значение поля name не изменилось
         softly.assertThat(getResponse.getName())
                 .isNotEqualTo(invalidName);
-
-
     }
+
     //Тест на проверку невозможности изменения имени пользователя без авторизации
     @Test
     public void userCantChangeNameWithoutToken() {
@@ -108,16 +106,5 @@ public class TestChangeNamee extends BaseTest {
         // Проверяем, что значение поля name не изменилось
         softly.assertThat(getResponse.getName())
                 .isNotEqualTo(badRequest.getName());
-
-
-
-
-
-
-
     }
-    }
-
-
-
-
+}
