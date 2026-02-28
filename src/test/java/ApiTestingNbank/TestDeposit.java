@@ -1,45 +1,27 @@
 package ApiTestingNbank;
-import io.restassured.http.ContentType;
+
+import models.*;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import requests.CreateNewAccountRequester;
+import requests.DepositMoneyRequester;
+import requests.GetCustomerProfileRequester;
+import specs.RequestSpecs;
+import specs.ResponseSpecs;
 import java.util.stream.Stream;
-import static io.restassured.RestAssured.given;
-import static org.hamcrest.Matchers.hasItem;
-import static org.hamcrest.Matchers.not;
-public class TestDeposit {
 
-    // Метод setup, объединил два метода (создать юзера + создать аккаунт),
-    // так как если создать две аннотации beforeAll, то нет последовательности и тесты падают с 401
+public class TestDeposit extends BaseTest{
+    public static CreateAccountResponse createAccountResponse;
+
+    //Создаем один аккаунт для тестов (id=1)
     @BeforeAll
-    public static void setup() throws InterruptedException {
-        // 1. Создаем пользователя
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/admin/users")
-                .contentType(ContentType.JSON)
-                .auth().preemptive().basic("admin", "admin")
-                .body("""
-            {
-                "username": "Test1234",
-                "password": "Test12345!",
-                "role": "USER"
-            }
-            """)
-        .when().post()
-                .then()
-                .statusCode(201).log().body();
-
-        Thread.sleep(2000);
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts")
-                .contentType(ContentType.JSON)
-                .auth().preemptive().basic("Test1234", "Test12345!")
-        .when().post()
-                .then()
-                .log().body().statusCode(201);
+    public static void  createAccount() throws InterruptedException {
+        String username = createdUserRequest.getUsername();
+        String password = createdUserRequest.getPassword();
+        createAccountResponse = new CreateNewAccountRequester(RequestSpecs.userSpec(username,password),
+                ResponseSpecs.entityWasCreated()).post().extract().as(CreateAccountResponse.class);
     }
 
     // Метод, который возвращает стрим валидных значений депозита
@@ -70,118 +52,214 @@ public class TestDeposit {
         );
     }
 
+    //Вспомогательный метод для негативных проверок, используется в userCantDepositMoneyWithInvalidData
+    private String formatJsonValue(Object value) {
+        return switch (value) {
+            case null -> "null";
+            case String string ->
+                    "\"" + value + "\"";
+            case Boolean b -> value.toString();
+            case Number number -> value.toString();
+            default ->
+                    "\"" + value.toString() + "\"";
+        };
+    }
+
     //Проверка возможности депозита - валидные значения. Статус код 200.
     // Источник входных данных - @MethodSource("validDepositValue")
     @ParameterizedTest
     @MethodSource("validDepositValue")
     public void userCanDepositMoneyValidData(Number number) {
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts/deposit")
-                .auth().preemptive().basic("Test1234", "Test12345!")
-                .contentType(ContentType.JSON)
-                .body("{\"id\": 1, \"balance\": " + number + "}")
-        .when().post()
-                .then()
-                .log().ifError()
-                .statusCode(200);
-        // Проверка суммы депозита
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts/1/transactions")
-                .auth().preemptive().basic("Test1234", "Test12345!")
-                .contentType(ContentType.JSON)
-                .when().get()
-                .then()
-                .statusCode(200)
-                .body("amount", hasItem(number.floatValue()))
-                .body("relatedAccountId", hasItem(1));
+        //Извлекаем логин и пароль из запроса на создание юзера
+        String username = createdUserRequest.getUsername();
+        String password = createdUserRequest.getPassword();
 
+        //Создаем тело запроса для метода post
+        DepositMoneyRequest request = DepositMoneyRequest.builder()
+                .id(createAccountResponse.getId()).balance(number).build();
 
+        //Отправляем get запрос для проверки
+        CustomerData beforeData = new GetCustomerProfileRequester(RequestSpecs.userSpec(username,password),
+                ResponseSpecs.ok()).get().extract().as(CustomerData.class);
+
+        //Извлекаем нужный для теста аккаунт
+        Account beforeAccount = beforeData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponse.getId())
+                .findFirst()
+                .orElseThrow();
+
+        //Извлекаем баланс до пополнения депозита
+        Number previousBalance = beforeAccount.getBalance();
+
+        //Отправляем post-запрос с депозитом и проверяем на 200 код
+        DepositMoneyResponse response = new DepositMoneyRequester(RequestSpecs.userSpec(username,password),
+                ResponseSpecs.ok()).post(request).extract().as(DepositMoneyResponse.class);
+
+        //Отправляем get запрос для проверки после пополнения депозита
+        CustomerData afterData = new GetCustomerProfileRequester(RequestSpecs.userSpec(username, password),
+                ResponseSpecs.ok()).get().extract().as(CustomerData.class);
+
+        //Извлекаем нужный для теста аккаунт после депозита
+        Account afterAccount = afterData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponse.getId())
+                .findFirst()
+                .orElseThrow();
+
+        //Проверка, что баланс изменился на сумму, которую передали из стрима validDepositValue()
+        softly.assertThat(afterAccount.getBalance().doubleValue())
+                .isEqualTo(previousBalance.doubleValue() + number.doubleValue());
+        //Проверка, что сумма есть в транзакциях, если есть, то возвращаем ок через isTrue
+        softly.assertThat(afterAccount.getTransactions().stream()
+                        .anyMatch(tx -> tx.getAmount().doubleValue() == number.doubleValue()))
+                .isTrue();
     }
-
-
-
 
     //Проверка возможности депозита - невалидные значения. Статус код 400.
     // Источник входных данных - @MethodSource("invalidDepositValue")
     @ParameterizedTest
     @MethodSource("invalidDepositValue")
-    public void userCantDepositMoneyWithInvalidData(Object object) {
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts/deposit")
-                .auth().preemptive().basic("Test1234", "Test12345!")
-                .contentType(ContentType.JSON)
-                .body("{\"id\": 1, \"balance\": " + object + "}")
-        .when().post()
-                .then()
-                .log().ifError()
-                .statusCode(not(200));
+    public void userCantDepositMoneyWithInvalidData(Object invalidValue) {
+        //Извлекаем логин и пароль из запроса на создание юзера
+        String username = createdUserRequest.getUsername();
+        String password = createdUserRequest.getPassword();
 
-        // Проверка, что невалидных данных нет в массиве депозитов
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts/1/transactions")
-                .auth().preemptive().basic("Test1234", "Test12345!")
-                .contentType(ContentType.JSON)
-                .when().get()
-                .then()
-                .statusCode(200)
-                .statusCode(200)
-                .body("amount", not(hasItem(object)));
+        //Отправляем get запрос для проверки
+        CustomerData beforeData = new GetCustomerProfileRequester(RequestSpecs.userSpec(username,password),
+                ResponseSpecs.ok()).get().extract().as(CustomerData.class);
+
+        //Формируем сырой json через String.format, тк pojo-класс не может этого сделать
+        String jsonBody = String.format(
+                "{\"id\": %d, \"balance\": %s}",
+                createAccountResponse.getId(),
+                formatJsonValue(invalidValue));
+
+        //Извлекаем нужный для теста аккаунт
+        Account beforeAccount = beforeData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponse.getId())
+                .findFirst()
+                .orElseThrow();
+        //Извлекаем баланс и размер транзакций до пополнения депозита из beforeAccount
+        Number previousBalance = beforeAccount.getBalance();
+        int previousTxCount = beforeAccount.getTransactions().size();
+
+        //Отправляем post-запрос с депозитом и проверяем на 400 код, но без записи в переменную
+        new DepositMoneyRequester(RequestSpecs.userSpec(username,password),
+                ResponseSpecs.invalidDataProvided()).post(jsonBody);
+
+        //Отправляем get запрос для проверки после пополнения депозита
+        CustomerData afterData = new GetCustomerProfileRequester(
+                RequestSpecs.userSpec(username, password), ResponseSpecs.ok()).get()
+                .extract().as(CustomerData.class);
+
+        //Извлекаем нужный для теста аккаунт
+        Account afterAccount = afterData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponse.getId())
+                .findFirst()
+                .orElseThrow();
+
+        // Проверка, что баланс не изменился (сравниваем значения из двух get-запросов)
+        softly.assertThat(afterAccount.getBalance().doubleValue())
+                .isEqualTo(previousBalance.doubleValue());
+        //Проверка, что размер массива transactions не изменился
+        softly.assertThat(afterAccount.getTransactions().size())
+                .isEqualTo(previousTxCount);
+
     }
 
     //Проверка невозможности депозита без токена. Статус код 401
     @Test
     public void userCantDepositMoneyWithoutToken() {
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts/deposit")
-                .contentType(ContentType.JSON)
-                .body("{\"id\": 1, \"balance\":4988}") //захардкодил для уникальности
-                .when().post()
-                .then()
-                .log().ifError()
-                .statusCode(401);
+        //Извлекаем логин и пароль из запроса на создание юзера
+        String username = createdUserRequest.getUsername();
+        String password = createdUserRequest.getPassword();
 
-        // Проверка, что невалидных данных нет в массиве депозитов
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts/1/transactions")
-                .auth().preemptive().basic("Test1234", "Test12345!")
-                .contentType(ContentType.JSON)
-                .when().get()
-                .then()
-                .statusCode(200)
-                .body("amount", not(hasItem(4988)));
+        //Отправляем get запрос для проверки
+        CustomerData beforeData = new GetCustomerProfileRequester(RequestSpecs.userSpec(username,password),
+                ResponseSpecs.ok()).get().extract().as(CustomerData.class);
+
+        //извлекаем нужный нам аккаунт
+        Account beforeAccount = beforeData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponse.getId())
+                .findFirst()
+                .orElseThrow();
+
+        //Извлекаем баланс и размер транзакций до пополнения депозита
+        Number previousBalance = beforeAccount.getBalance();
+        int previousTxCount = beforeAccount.getTransactions().size();
+
+        //Создаем тело запроса для метода post
+        DepositMoneyRequest request = DepositMoneyRequest.builder()
+                .id(createAccountResponse.getId()).balance(100).build();
+
+        //Отправляем post-запрос с депозитом
+        new DepositMoneyRequester(RequestSpecs.unauthSpec(),
+                ResponseSpecs.invalidToken()).post(request);
+
+        //Отправляем get запрос для проверки после пополнения депозита
+        CustomerData afterData = new GetCustomerProfileRequester(
+                RequestSpecs.userSpec(username, password), ResponseSpecs.ok()).get()
+                .extract().as(CustomerData.class);
+
+        //извлекаем нужный нам аккаунт
+        Account afterAccount = afterData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponse.getId())
+                .findFirst()
+                .orElseThrow();
+
+        // Проверка, что баланс не изменился (сравниваем значения из двух get-запросов)
+        softly.assertThat(afterAccount.getBalance().doubleValue())
+                .isEqualTo(previousBalance.doubleValue());
+        //Проверка, что размер массива transactions не изменился
+        softly.assertThat(afterAccount.getTransactions().size())
+                .isEqualTo(previousTxCount);
     }
 
     //Проверка невозможности депозита с несуществующего аккаунта. Статус код 403
     @Test
     public void  userCannotDepositToNonExistentAccount() {
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts/deposit")
-                .contentType(ContentType.JSON)
-                .auth().preemptive().basic("Test1234", "Test12345!")
-                .body("{\"id\": 999, \"balance\":4987}") //захардкодил для уникальности
-        .when().post()
-                .then()
-                .log().ifError()
-                .statusCode(403);
+        //Извлекаем логин и пароль из запроса на создание юзера
+        String username = createdUserRequest.getUsername();
+        String password = createdUserRequest.getPassword();
 
-        // Проверка, что невалидных данных нет в массиве депозитов
-        given()
-                .baseUri("http://localhost:4111")
-                .basePath("/api/v1/accounts/1/transactions")
-                .auth().preemptive().basic("Test1234", "Test12345!")
-                .contentType(ContentType.JSON)
-                .when().get()
-                .then()
-                .statusCode(200)
-                .body("amount", not(hasItem(4987)));
+        //Отправляем get запрос для проверки
+        CustomerData beforeData = new GetCustomerProfileRequester(RequestSpecs.userSpec(username,password),
+                ResponseSpecs.ok()).get().extract().as(CustomerData.class);
+
+        //Извлечение целевого аккаунта по id
+        Account beforeAccount = beforeData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponse.getId())
+                .findFirst()
+                .orElseThrow();
+
+        //Извлекаем баланс и размер транзакций до пополнения депозита
+        Number previousBalance = beforeAccount.getBalance();
+        int previousTxCount = beforeAccount.getTransactions().size();
+
+        //Создаем тело для post-запроса
+        DepositMoneyRequest request = DepositMoneyRequest.builder()
+                .id(createAccountResponse.getId() + 100).balance(100).build();
+
+        //Отправляем post-запрос
+        new DepositMoneyRequester(RequestSpecs.userSpec(username,password),
+                ResponseSpecs.invalidIdAccount()).post(request);
+
+        //Отправляем get запрос для проверки
+        CustomerData afterData = new GetCustomerProfileRequester(
+                RequestSpecs.userSpec(username, password), ResponseSpecs.ok()).get()
+                .extract().as(CustomerData.class);
+
+        //Извлекаем id нужного нам аккаунта после депозита
+        Account afterAccount = afterData.getAccounts().stream()
+                .filter(acc -> acc.getId() == createAccountResponse.getId())
+                .findFirst()
+                .orElseThrow();
+
+        // Проверка, что баланс не изменился (сравниваем значения из двух get-запросов)
+        softly.assertThat(afterAccount.getBalance().doubleValue())
+                .isEqualTo(previousBalance.doubleValue());
+        //Проверка, что размер массива transactions не изменился
+        softly.assertThat(afterAccount.getTransactions().size())
+                .isEqualTo(previousTxCount);
     }
-
 }
 
