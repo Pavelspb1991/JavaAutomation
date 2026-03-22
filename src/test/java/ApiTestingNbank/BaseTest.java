@@ -2,41 +2,33 @@ package ApiTestingNbank;
 import generators.RandomData;
 import models.CreateUserRequest;
 import models.CreateUserResponse;
-import models.UserRole;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import requests.CreateNewUserRequester;
-import specs.RequestSpecs;
-import specs.ResponseSpecs;
+import org.junit.jupiter.api.*;
+import requests.steps.AdminSteps;
 
-public class BaseTest {
-    protected SoftAssertions softly;
+public abstract class BaseTest {
+
     protected static CreateUserRequest createdUserRequest;
     protected static CreateUserResponse createdUserResponse;
+    protected SoftAssertions softly;
+
+    @BeforeAll
+    public static void setUp() {
+        // Используем AdminSteps для создания пользователя
+        createdUserRequest = AdminSteps.generateRandomUserRequest();
+        createdUserResponse = AdminSteps.createUser(createdUserRequest);
+    }
 
     @BeforeEach
-    public void setupTest() {
-        this.softly = new SoftAssertions();
+    public void initSoftly() {
+        softly = new SoftAssertions();
     }
 
     @AfterEach
-    public void afterTest() {
+    public void assertSoftly() {
         softly.assertAll();
-    }
-
-    //Создаем Юзера перед тестами, вынес создание в базовый класс
-    @BeforeAll
-    public static void createUser() throws InterruptedException {
-        createdUserRequest = CreateUserRequest.
-                builder().username(RandomData.getUsername())
-                .password(RandomData.getPassword())
-                .role(UserRole.USER.toString())
-                .build();
-
-        createdUserResponse  = new CreateNewUserRequester(RequestSpecs.adminSpec(),
-                ResponseSpecs.entityWasCreated()).post(createdUserRequest).extract().as(CreateUserResponse.class);
-
     }
 }
