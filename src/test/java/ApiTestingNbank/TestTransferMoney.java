@@ -9,7 +9,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import requests.steps.AccountSteps;
 import requests.steps.UserSteps;
 import specs.ResponseSpecs;
-
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -150,7 +149,7 @@ public class TestTransferMoney extends BaseTest{
 
     @Test
     public void userCantTransferToInvalidAccount() {
-        Long invalidAccountId = receiverAccount.getId() + 100;
+        Long invalidAccountId = AccountSteps.generateNonExistentAccountId();
         CustomerData beforeData = userSteps.getProfile();
         Account receiverBefore = findAccountById(beforeData.getAccounts(), receiverAccount.getId());
         Number receiverBalanceBefore = receiverBefore.getBalance();
@@ -170,7 +169,7 @@ public class TestTransferMoney extends BaseTest{
 
     @Test
     public void userCantTransferFromInvalidAccount() {
-        Long invalidAccountId = senderAccount.getId() + 100;
+        Long invalidAccountId = AccountSteps.generateNonExistentAccountId();
         CustomerData beforeData = userSteps.getProfile();
         Account receiverBefore = findAccountById(beforeData.getAccounts(), receiverAccount.getId());
         Number receiverBalanceBefore = receiverBefore.getBalance();
@@ -178,7 +177,7 @@ public class TestTransferMoney extends BaseTest{
         accountSteps.transferExpectingError(
                 invalidAccountId,
                 receiverAccount.getId(),
-                1000.0,
+                AccountSteps.generateRandomTransferAmount(),
                 ResponseSpecs.invalidIdAccount()
         );
 

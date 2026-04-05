@@ -8,7 +8,6 @@ import requests.skelethon.requesters.ValidatedCrudRequester;
 import specs.RequestSpecs;
 import specs.ResponseSpecs;
 import io.restassured.specification.ResponseSpecification;
-
 import java.util.Random;
 
 public class UserSteps {
@@ -50,18 +49,6 @@ public class UserSteps {
         ).put(userId, request);
     }
 
-    public String updateNameExpectingErrorWithBody(String newName, ResponseSpecification errorSpec) {
-        UpdateCustomerProfileRequest request = UpdateCustomerProfileRequest.builder()
-                .name(newName)
-                .build();
-
-        return new ValidatedCrudRequester<UpdateCustomerProfileResponse>(
-                RequestSpecs.authAsUser(username, password),
-                Endpoint.CUSTOMER_PROFILE,
-                errorSpec  // ResponseSpecs.invalidDataProvided() для 400
-        ).putExpectingErrorWithBody(userId, request);  // ← возвращает строку!
-    }
-
     public void updateNameWithoutAuth(String newName) {
         UpdateCustomerProfileRequest request = UpdateCustomerProfileRequest.builder()
                 .name(newName)
@@ -82,4 +69,3 @@ public class UserSteps {
                 lastNames[random.nextInt(lastNames.length)];
     }
 }
-

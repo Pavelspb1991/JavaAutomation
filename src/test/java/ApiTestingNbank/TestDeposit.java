@@ -89,7 +89,7 @@ public class TestDeposit extends BaseTest {
         Number previousBalance = beforeAccount.getBalance();
         int previousTxCount = beforeAccount.getTransactions().size();
 
-        accountSteps.depositWithoutAuth(createdAccount.getId(), 100);
+        accountSteps.depositWithoutAuth(createdAccount.getId(), AccountSteps.generateRandomTransferAmount());
 
         CustomerData afterData = userSteps.getProfile();
         Account afterAccount = findAccountById(afterData.getAccounts(), createdAccount.getId());
@@ -106,8 +106,8 @@ public class TestDeposit extends BaseTest {
         Account beforeAccount = findAccountById(beforeData.getAccounts(), createdAccount.getId());
         Number previousBalance = beforeAccount.getBalance();
 
-        Long nonExistentId = createdAccount.getId() + 100;
-        accountSteps.depositExpectingError(nonExistentId, 100,
+        Long nonExistentId = AccountSteps.generateNonExistentAccountId();
+        accountSteps.depositExpectingError(nonExistentId, AccountSteps.generateRandomTransferAmount(),
                 ResponseSpecs.invalidIdAccount());
 
         CustomerData afterData = userSteps.getProfile();

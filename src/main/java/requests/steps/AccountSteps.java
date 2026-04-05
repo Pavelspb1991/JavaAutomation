@@ -6,6 +6,7 @@ import requests.skelethon.requesters.ValidatedCrudRequester;
 import specs.RequestSpecs;
 import specs.ResponseSpecs;
 import io.restassured.specification.ResponseSpecification;
+import java.util.Random;
 
 public class AccountSteps {
     private final String username;
@@ -118,4 +119,12 @@ public class AccountSteps {
                 errorSpec
         ).postExpectingErrorWithRawBody(rawBody);
     }
+
+    public static Long generateNonExistentAccountId() {
+        return new Random().nextLong(1000000000L, 9999999999L);
+    }
+
+    public static Number generateRandomTransferAmount() {
+             return new Random().nextDouble(1.0, 10000.0);
+         }
 }

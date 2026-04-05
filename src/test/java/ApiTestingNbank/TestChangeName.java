@@ -5,7 +5,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import requests.skelethon.Endpoint;
+import requests.skelethon.requesters.ValidatedCrudRequester;
 import requests.steps.UserSteps;
+import specs.RequestSpecs;
 import specs.ResponseSpecs;
 import models.CustomerData;
 
@@ -48,10 +51,16 @@ public class TestChangeName extends BaseTest {
             "A", "AbCd", "John1 Doe", "John Doe1", "John1 Doe Jack", "Привет", ""
     })
     public void userCantChangeNameWithInvalidData(String invalidName) {
-        String errorMessage = userSteps.updateNameExpectingErrorWithBody(
-                invalidName,
+        UpdateCustomerProfileRequest request = UpdateCustomerProfileRequest.builder()
+                .name(invalidName)
+                .build();
+
+        String errorMessage = new ValidatedCrudRequester<UpdateCustomerProfileResponse>(
+                RequestSpecs.authAsUser(createdUserRequest.getUsername(), createdUserRequest.getPassword()),
+                Endpoint.CUSTOMER_PROFILE,
                 ResponseSpecs.invalidDataProvided()
-        );
+        ).putExpectingErrorWithBody(createdUserResponse.getId(), request);
+
         softly.assertThat(errorMessage).isEqualTo(ErrorMessages.INVALID_NAME);
 
         CustomerData profile = userSteps.getProfile();
