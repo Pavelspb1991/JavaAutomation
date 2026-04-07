@@ -138,7 +138,8 @@ public class TestTransferMoney extends BaseTest{
         Account receiverBefore = findAccountById(beforeData.getAccounts(), receiverAccount.getId());
         Number receiverBalanceBefore = receiverBefore.getBalance();
 
-        accountSteps.transferWithoutAuth(senderAccount.getId(), receiverAccount.getId(), 1000.0);
+        accountSteps.transferWithoutAuth(senderAccount.getId(), receiverAccount.getId(),
+                AccountSteps.generateRandomTransferAmount());
 
         CustomerData afterData = userSteps.getProfile();
         Account receiverAfter = findAccountById(afterData.getAccounts(), receiverAccount.getId());
@@ -157,7 +158,7 @@ public class TestTransferMoney extends BaseTest{
         accountSteps.transferExpectingError(
                 senderAccount.getId(),
                 invalidAccountId,
-                1000.0,
+                AccountSteps.generateRandomTransferAmount(),
                 ResponseSpecs.invalidIdAccount()
         );
 
@@ -199,7 +200,7 @@ public class TestTransferMoney extends BaseTest{
         accountSteps.transferExpectingError(
                 zeroBalanceAccount.getId(),
                 receiverAccount.getId(),
-                0.1,
+                AccountSteps.generateRandomTransferAmount(),
                 ResponseSpecs.invalidDataProvided()
         );
 
