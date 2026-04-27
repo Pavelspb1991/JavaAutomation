@@ -1,110 +1,80 @@
 package ApiTestingNbank;
-import generators.RandomData;
 import models.*;
+import models.comparison.ModelAssertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
-import requests.GetCustomerProfileRequester;
-import requests.UpdateCustomerProfileRequester;
+import org.junit.jupiter.params.provider.ValueSource;
+import requests.skelethon.Endpoint;
+import requests.skelethon.requesters.ValidatedCrudRequester;
+import requests.steps.UserSteps;
 import specs.RequestSpecs;
 import specs.ResponseSpecs;
-import java.util.stream.Stream;
+import models.CustomerData;
 
 public class TestChangeName extends BaseTest {
+    private UserSteps userSteps;
 
-    // Метод, который возвращает стрим валидных значений
-    static Stream<String> validNames() {
-        return Stream.of("A B",
-                "Ab Cd",
-                "John Doe",
-                "Abcdefghijaaaa Klmnopqrstaaaaaaaa");
+    // Метод инициализирует UserSteps с данными тестового пользователя.
+    @BeforeEach
+    public void initUserSteps() {
+        userSteps = new UserSteps(
+                createdUserRequest.getUsername(),
+                createdUserRequest.getPassword(),
+                createdUserResponse.getId()
+        );
     }
 
-    // Метод, который возвращает стрим невалидных значений
-    static Stream<String> invalidNames() {
-        return Stream.of("A",
-                "AbCd",
-                "John1 Doe",
-                "John Doe1",
-                "John1 Doe Jack",
-                "Привет",
-                "");
+    //Метод проверяет возможность изменения имени пользователя (валидные значения)
+    //Источник входных данных - @ValueSource
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "A B",
+            "Ab Cd",
+            "Abcdefghijklmno Abcdefghijklmn"
+    })
+    public void userCanChangeNameWithValidData(String validName) {
+        UpdateCustomerProfileRequest request = UpdateCustomerProfileRequest.builder()
+                .name(validName)
+                .build();
+        UpdateCustomerProfileResponse response = userSteps.updateName(request);
+        ModelAssertions.assertThatModels(request, response).match();
+
+        CustomerData profile = userSteps.getProfile();
+        softly.assertThat(profile.getName()).isEqualTo(validName);
     }
 
-    // Параметризованный тест, проверка возможности изменения имени пользователя - валидные данные
-    //Источник входных данных - @MethodSource("validNames")
+    //Тест на проверку невозможности изменения имени пользователя при невалидных данных
+    //Источник входных данных - @ValueSource
     @ParameterizedTest
-    @MethodSource("validNames")
-    public void userCanChangeNameCheckValidData(String newName) {
-        //получаем данные пользователя с метода createUser, который в BeforeAll создает его перед тестами (класс BaseTest)
-        String username = createdUserRequest.getUsername();
-        String password = createdUserRequest.getPassword();
-        //Создаем тело запроса для метода put
-        UpdateCustomerProfileRequest request = UpdateCustomerProfileRequest.builder().name(newName).build();
-        //Отправляем PUT запрос и записываем результат в updateCustomerProfileResponse
-        UpdateCustomerProfileResponse updateCustomerProfileResponse = new UpdateCustomerProfileRequester(
-                RequestSpecs.userSpec(username,password), ResponseSpecs.ok()).put(request)
-                .extract().as(UpdateCustomerProfileResponse.class);
-        // Проверяем значение поля name
-        softly.assertThat(request.getName())
-                .isEqualTo(updateCustomerProfileResponse.getCustomer().getName());
-
-        //Отправляем GET запрос и записываем результат в getResponse
-        CustomerData getResponse = new
-                GetCustomerProfileRequester(RequestSpecs.userSpec(username,password), ResponseSpecs.ok())
-                .get().extract().as(CustomerData.class);
-        // Проверяем, что значение поля name изменилось
-        softly.assertThat(getResponse.getName())
-                .isEqualTo(newName);
-        }
-
-    //Параметризованный тест на проверку невозможности изменения имени пользователя при невалидных данных.
-    //Источник входных данных - @MethodSource("invalidNames")
-    @ParameterizedTest
-    @MethodSource("invalidNames")
+    @ValueSource(strings = {
+            "A", "AbCd", "John1 Doe", "John Doe1", "John1 Doe Jack", "Привет", ""
+    })
     public void userCantChangeNameWithInvalidData(String invalidName) {
-        //получаем данные пользователя с метода createUser, который в BeforeAll создает его перед тестами (класс BaseTest)
-        String username = createdUserRequest.getUsername();
+        UpdateCustomerProfileRequest request = UpdateCustomerProfileRequest.builder()
+                .name(invalidName)
+                .build();
 
-        String password = createdUserRequest.getPassword();
-        //Создаем тело запроса для метода put
-        UpdateCustomerProfileRequest badRequest = UpdateCustomerProfileRequest.builder().name(invalidName).build();
-        //Отправляем PUT запрос и записываем результат в errorMessage типа String
-        String errorMessage = new UpdateCustomerProfileRequester(
-                RequestSpecs.userSpec(username,password), ResponseSpecs.invalidDataProvided()).put(badRequest)
-                .extract().asString();
-        //Проверяем текст сообщения об ошибке
+        String errorMessage = new ValidatedCrudRequester<UpdateCustomerProfileResponse>(
+                RequestSpecs.authAsUser(createdUserRequest.getUsername(), createdUserRequest.getPassword()),
+                Endpoint.CUSTOMER_PROFILE,
+                ResponseSpecs.invalidDataProvided()
+        ).putExpectingErrorWithBody(createdUserResponse.getId(), request);
+
         softly.assertThat(errorMessage).isEqualTo(ErrorMessages.INVALID_NAME);
 
-        //Отправляем GET запрос и записываем результат в getResponse
-        CustomerData getResponse = new
-                GetCustomerProfileRequester(RequestSpecs.userSpec(username,password), ResponseSpecs.ok())
-                .get().extract().as(CustomerData.class);
-        // Проверяем, что значение поля name не изменилось
-        softly.assertThat(getResponse.getName())
-                .isNotEqualTo(invalidName);
+        CustomerData profile = userSteps.getProfile();
+        softly.assertThat(profile.getName()).isNotEqualTo(invalidName);
     }
 
     //Тест на проверку невозможности изменения имени пользователя без авторизации
     @Test
     public void userCantChangeNameWithoutToken() {
-        //получаем данные пользователя с метода createUser, который в BeforeAll создает его перед тестами (класс BaseTest)
-        String username = createdUserRequest.getUsername();
-        String password = createdUserRequest.getPassword();
-        //Создаем тело запроса для метода put
-        UpdateCustomerProfileRequest badRequest = UpdateCustomerProfileRequest
-                .builder().name(RandomData.validUpdateName()).build();
-        //Отправляем PUT запрос без записывания результата в переменную (с проверкой на 401 статус-код)
-        new UpdateCustomerProfileRequester(
-                RequestSpecs.unauthSpec(), ResponseSpecs.invalidToken()).put(badRequest)
-                .extract().asString();
+        String originalName = userSteps.getProfile().getName();
+        String newName = UserSteps.generateRandomValidName();
+        userSteps.updateNameWithoutAuth(newName);
 
-        //Отправляем GET запрос и записываем результат в getResponse
-        CustomerData getResponse = new
-                GetCustomerProfileRequester(RequestSpecs.userSpec(username,password), ResponseSpecs.ok())
-                .get().extract().as(CustomerData.class);
-        // Проверяем, что значение поля name не изменилось
-        softly.assertThat(getResponse.getName())
-                .isNotEqualTo(badRequest.getName());
+        CustomerData getResponse = userSteps.getProfile();
+        softly.assertThat(getResponse.getName()).isEqualTo(originalName);
     }
 }

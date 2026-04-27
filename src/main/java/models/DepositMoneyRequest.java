@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Builder
 
-public class DepositMoneyRequest extends BaseModel{
-    private int id;
+public class DepositMoneyRequest extends BaseModel {
+    private Long id;
     private Number balance;
 }

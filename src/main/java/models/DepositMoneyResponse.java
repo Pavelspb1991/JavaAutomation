@@ -15,5 +15,4 @@ public class DepositMoneyResponse extends BaseModel {
     private String accountNumber;
     private Number balance;
     private List<Transaction> transactions;
-
 }
