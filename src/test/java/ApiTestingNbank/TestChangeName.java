@@ -1,16 +1,18 @@
 package ApiTestingNbank;
-import models.*;
-import models.comparison.ModelAssertions;
+import api.models.ErrorMessages;
+import api.models.UpdateCustomerProfileRequest;
+import api.models.UpdateCustomerProfileResponse;
+import api.models.comparison.ModelAssertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import requests.skelethon.Endpoint;
-import requests.skelethon.requesters.ValidatedCrudRequester;
-import requests.steps.UserSteps;
-import specs.RequestSpecs;
-import specs.ResponseSpecs;
-import models.CustomerData;
+import api.requests.skelethon.Endpoint;
+import api.requests.skelethon.requesters.ValidatedCrudRequester;
+import api.requests.steps.UserSteps;
+import api.specs.RequestSpecs;
+import api.specs.ResponseSpecs;
+import api.models.CustomerData;
 
 public class TestChangeName extends BaseTest {
     private UserSteps userSteps;

@@ -1,13 +1,11 @@
 package ApiTestingNbank;
-import generators.RandomData;
-import models.CreateUserRequest;
-import models.CreateUserResponse;
+import api.models.CreateUserRequest;
+import api.models.CreateUserResponse;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.*;
-import requests.steps.AdminSteps;
+import api.requests.steps.AdminSteps;
 
 public abstract class BaseTest {
 

@@ -1,38 +1,37 @@
 package UiTestingNbank;
 
+import ApiTestingNbank.BaseTest;
+import api.configs.Config;
+import api.models.CreateUserRequest;
+import api.specs.RequestSpecs;
 import com.codeborne.selenide.Configuration;
-import models.CreateUserRequest;
-import models.CreateUserResponse;
-import org.junit.jupiter.api.AfterEach;
+import com.codeborne.selenide.Selenide;
 import org.junit.jupiter.api.BeforeAll;
-import org.openqa.selenium.chrome.ChromeOptions;
-import requests.steps.AdminSteps;
 import java.util.Map;
 
-import static com.codeborne.selenide.Selenide.closeWebDriver;
+import static com.codeborne.selenide.Selenide.*;
 
-public abstract class BaseUiTest {
-
-    protected static CreateUserRequest createdUserRequest;
-    protected static CreateUserResponse createdUserResponse;
-
+public class BaseUiTest extends BaseTest {
     @BeforeAll
-    public static void setupSelenoidAndCreateUser() {
-        ChromeOptions options = new ChromeOptions();
-        options.setCapability("selenoid:options",
-                Map.of("enableVNC", true, "enableLog", true));
-        Configuration.browserCapabilities = options;
-        Configuration.remote = "http://127.0.0.1:4444/wd/hub";
-        Configuration.baseUrl = "http://192.168.50.9:3000";
-        Configuration.browser = "chrome";
-        Configuration.browserSize = "1920x1080";
+    public static void setupSelenoid() {
+        Configuration.remote = Config.getProperty("uiRemote");
+        Configuration.baseUrl = Config.getProperty("uiBaseUrl");
+        Configuration.browser = Config.getProperty("browser");
+        Configuration.browserSize = Config.getProperty("browserSize");
 
-        createdUserRequest = AdminSteps.generateRandomUserRequest();
-        createdUserResponse = AdminSteps.createUser(createdUserRequest);
+        Configuration.browserCapabilities.setCapability("selenoid:options",
+                Map.of("enableVNC", true, "enableLog", true)
+        );
     }
 
-    @AfterEach
-    public void closeBrowser() {
-        closeWebDriver();
+    public void authAsUser(String username, String password) {
+        Selenide.open("/");
+        String userAuthHeader = RequestSpecs.getUserAuthHeader(username, password);
+        executeJavaScript("localStorage.setItem('authToken', arguments[0]);", userAuthHeader);
+        Selenide.open("/dashboard");
+    }
+
+    public void authAsUser(CreateUserRequest createUserRequest) {
+        authAsUser(createUserRequest.getUsername(), createUserRequest.getPassword());
     }
 }
