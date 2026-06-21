@@ -7,5 +7,7 @@ import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
-public @interface AdminSession {
+public @interface UserSession {
+    int value() default 1;
+    int auth() default 0;
 }

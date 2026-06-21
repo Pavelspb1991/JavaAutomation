@@ -1,10 +1,12 @@
 package ApiTestingNbank;
-import api.models.ErrorMessages;
-import api.models.UpdateCustomerProfileRequest;
-import api.models.UpdateCustomerProfileResponse;
+
+import api.models.*;
 import api.models.comparison.ModelAssertions;
-import org.junit.jupiter.api.BeforeEach;
+import common.annotations.UserSession;
+import common.extensions.UserSessionExtension;
+import common.storage.SessionStorage;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import api.requests.skelethon.Endpoint;
@@ -12,71 +14,55 @@ import api.requests.skelethon.requesters.ValidatedCrudRequester;
 import api.requests.steps.UserSteps;
 import api.specs.RequestSpecs;
 import api.specs.ResponseSpecs;
-import api.models.CustomerData;
 
+
+@ExtendWith(UserSessionExtension.class)
 public class TestChangeName extends BaseTest {
-    private UserSteps userSteps;
 
-    // Метод инициализирует UserSteps с данными тестового пользователя.
-    @BeforeEach
-    public void initUserSteps() {
-        userSteps = new UserSteps(
-                createdUserRequest.getUsername(),
-                createdUserRequest.getPassword(),
-                createdUserResponse.getId()
-        );
-    }
-
-    //Метод проверяет возможность изменения имени пользователя (валидные значения)
-    //Источник входных данных - @ValueSource
     @ParameterizedTest
-    @ValueSource(strings = {
-            "A B",
-            "Ab Cd",
-            "Abcdefghijklmno Abcdefghijklmn"
-    })
+    @UserSession
+    @ValueSource(strings = {"A B", "Ab Cd", "Abcdefghijklmno Abcdefghijklmn"})
     public void userCanChangeNameWithValidData(String validName) {
         UpdateCustomerProfileRequest request = UpdateCustomerProfileRequest.builder()
                 .name(validName)
                 .build();
-        UpdateCustomerProfileResponse response = userSteps.updateName(request);
+        UpdateCustomerProfileResponse response = SessionStorage.getSteps().updateName(request);
         ModelAssertions.assertThatModels(request, response).match();
 
-        CustomerData profile = userSteps.getProfile();
+        CustomerData profile = SessionStorage.getSteps().getProfile();
         softly.assertThat(profile.getName()).isEqualTo(validName);
     }
 
-    //Тест на проверку невозможности изменения имени пользователя при невалидных данных
-    //Источник входных данных - @ValueSource
     @ParameterizedTest
-    @ValueSource(strings = {
-            "A", "AbCd", "John1 Doe", "John Doe1", "John1 Doe Jack", "Привет", ""
-    })
+    @UserSession
+    @ValueSource(strings = {"A", "AbCd", "John1 Doe", "John Doe1", "John1 Doe Jack", "Привет", ""})
     public void userCantChangeNameWithInvalidData(String invalidName) {
         UpdateCustomerProfileRequest request = UpdateCustomerProfileRequest.builder()
                 .name(invalidName)
                 .build();
 
         String errorMessage = new ValidatedCrudRequester<UpdateCustomerProfileResponse>(
-                RequestSpecs.authAsUser(createdUserRequest.getUsername(), createdUserRequest.getPassword()),
+                RequestSpecs.authAsUser(
+                        SessionStorage.getUser().getUsername(),
+                        SessionStorage.getUser().getPassword()),
                 Endpoint.CUSTOMER_PROFILE,
                 ResponseSpecs.invalidDataProvided()
-        ).putExpectingErrorWithBody(createdUserResponse.getId(), request);
+        ).putExpectingErrorWithBody(SessionStorage.getUserResponse().getId(), request);
 
         softly.assertThat(errorMessage).isEqualTo(ErrorMessages.INVALID_NAME);
 
-        CustomerData profile = userSteps.getProfile();
+        CustomerData profile = SessionStorage.getSteps().getProfile();
         softly.assertThat(profile.getName()).isNotEqualTo(invalidName);
     }
 
-    //Тест на проверку невозможности изменения имени пользователя без авторизации
     @Test
+    @UserSession
     public void userCantChangeNameWithoutToken() {
-        String originalName = userSteps.getProfile().getName();
+        String originalName = SessionStorage.getSteps().getProfile().getName();
         String newName = UserSteps.generateRandomValidName();
-        userSteps.updateNameWithoutAuth(newName);
+        SessionStorage.getSteps().updateNameWithoutAuth(newName);
 
-        CustomerData getResponse = userSteps.getProfile();
+        CustomerData getResponse = SessionStorage.getSteps().getProfile();
         softly.assertThat(getResponse.getName()).isEqualTo(originalName);
     }
 }

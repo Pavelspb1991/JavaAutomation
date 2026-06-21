@@ -3,9 +3,8 @@ package ui.pages;
 import com.codeborne.selenide.SelenideElement;
 import lombok.Getter;
 import org.openqa.selenium.Alert;
-
+import ui.elements.AmountInput;
 import static com.codeborne.selenide.Condition.text;
-import static com.codeborne.selenide.Condition.value;
 import static com.codeborne.selenide.Selectors.byText;
 import static com.codeborne.selenide.Selenide.$;
 import static com.codeborne.selenide.Selenide.switchTo;
@@ -14,8 +13,8 @@ import static com.codeborne.selenide.Selenide.switchTo;
 public class DepositPage extends BasePage<DepositPage> {
 
     private SelenideElement accountSelect = $("select");
-    private SelenideElement amountInput = $("[placeholder='Enter amount']");
     private SelenideElement depositButton = $(byText("💵 Deposit"));
+    private AmountInput amountInput = new AmountInput($("[placeholder='Enter amount']"));
 
     @Override
     public String url() {
@@ -29,8 +28,8 @@ public class DepositPage extends BasePage<DepositPage> {
     }
 
     public DepositPage enterAmount(double amount) {
-        amountInput.setValue(String.valueOf(amount));
-        amountInput.shouldHave(value(String.valueOf(amount)));
+        amountInput.setValue(amount);
+        amountInput.shouldHaveValue(amount);
         return this;
     }
 
