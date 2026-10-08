@@ -1,11 +1,13 @@
 package api.requests.skelethon.requesters;
 
+import io.restassured.common.mapper.TypeRef;
 import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
 import api.models.BaseModel;
 import api.requests.skelethon.Endpoint;
 import api.requests.skelethon.HttpRequest;
 import api.requests.skelethon.interfaces.CrudEndpointInterface;
+import java.util.List;
 
 public class ValidatedCrudRequester<T extends BaseModel> extends HttpRequest implements CrudEndpointInterface {
     private CrudRequester crudRequester;
@@ -37,7 +39,8 @@ public class ValidatedCrudRequester<T extends BaseModel> extends HttpRequest imp
     public String putExpectingErrorWithBody(long id, BaseModel model) {
         return crudRequester.put(id, model)
                 .extract()
-                .asString();
+                .jsonPath()
+                .getString("message");
     }
 
     @Override
@@ -68,5 +71,10 @@ public class ValidatedCrudRequester<T extends BaseModel> extends HttpRequest imp
         crudRequester.post(rawBody);
     }
 
-
+    public List<T> getAll(Class<T> clazz) {
+        return crudRequester.getAll()
+                .extract()
+                .jsonPath()
+                .getList("$", clazz);
+    }
 }

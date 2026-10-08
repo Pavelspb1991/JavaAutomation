@@ -40,8 +40,15 @@ public class ResponseSpecs {
                 .build();
     }
 
-    //Спецификация статус-код 403
-    public static ResponseSpecification invalidIdAccount() {
+    //Спецификация статус-код 400 — несуществующий receiver (куда переводим)
+    public static ResponseSpecification invalidReceiverAccount() {
+        return defaultResponseBuilder()
+                .expectStatusCode(HttpStatus.SC_BAD_REQUEST)
+                .build();
+    }
+
+    //Спецификация статус-код 403 — несуществующий sender (от кого переводим)
+    public static ResponseSpecification invalidSenderAccount() {
         return defaultResponseBuilder()
                 .expectStatusCode(HttpStatus.SC_FORBIDDEN)
                 .build();

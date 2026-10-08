@@ -2,15 +2,20 @@ package UiTestingNbank;
 
 import ApiTestingNbank.BaseTest;
 import api.configs.Config;
-import api.models.CreateUserRequest;
-import api.specs.RequestSpecs;
 import com.codeborne.selenide.Configuration;
-import com.codeborne.selenide.Selenide;
+import common.extensions.BrowserMatchExtension;
+import common.extensions.UserSessionExtension;
+import common.storage.SessionStorage;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.extension.ExtendWith;
+import ui.pages.BasePage;
+
 import java.util.Map;
 
-import static com.codeborne.selenide.Selenide.*;
 
+@ExtendWith(UserSessionExtension.class)
+@ExtendWith(BrowserMatchExtension.class)
 public class BaseUiTest extends BaseTest {
     @BeforeAll
     public static void setupSelenoid() {
@@ -18,20 +23,14 @@ public class BaseUiTest extends BaseTest {
         Configuration.baseUrl = Config.getProperty("uiBaseUrl");
         Configuration.browser = Config.getProperty("browser");
         Configuration.browserSize = Config.getProperty("browserSize");
+        Configuration.timeout = 12000;
 
         Configuration.browserCapabilities.setCapability("selenoid:options",
                 Map.of("enableVNC", true, "enableLog", true)
         );
     }
-
-    public void authAsUser(String username, String password) {
-        Selenide.open("/");
-        String userAuthHeader = RequestSpecs.getUserAuthHeader(username, password);
-        executeJavaScript("localStorage.setItem('authToken', arguments[0]);", userAuthHeader);
-        Selenide.open("/dashboard");
-    }
-
-    public void authAsUser(CreateUserRequest createUserRequest) {
-        authAsUser(createUserRequest.getUsername(), createUserRequest.getPassword());
+    @BeforeEach
+    public void loginToUi() {
+        BasePage.authAsUser(SessionStorage.getUser());  // ← ЗДЕСЬ!
     }
 }

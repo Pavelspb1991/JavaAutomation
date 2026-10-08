@@ -38,6 +38,13 @@ public enum Endpoint {
             null,
             CustomerData.class
     ),
+
+    CUSTOMER_ACCOUNTS(
+            "/customer/accounts",
+            null,
+            Account.class
+    ),
+
     DEPOSIT(
             "/accounts/deposit",
             DepositMoneyRequest.class,

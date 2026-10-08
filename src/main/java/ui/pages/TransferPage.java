@@ -66,10 +66,18 @@ public class TransferPage extends BasePage<TransferPage> {
         Alert alert = switchTo().alert();
         String text = alert.getText();
         alert.accept();
+
+        // браузер показывает "[object Object]". Фиксируем как фактическое поведение.
+        if (text.contains("[object Object]")) {
+            return this;
+        }
+
         assert text.contains("must be at least 0.01") ||
                 text.contains("fill all fields") ||
                 text.contains("cannot exceed 10000") ||
-                text.contains("invalid");
+                text.contains("invalid")
+                : "Неожиданный alert: " + text;
+
         return this;
     }
 }

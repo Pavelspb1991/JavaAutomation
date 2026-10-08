@@ -6,6 +6,7 @@ import api.requests.skelethon.requesters.ValidatedCrudRequester;
 import api.specs.RequestSpecs;
 import api.specs.ResponseSpecs;
 import io.restassured.specification.ResponseSpecification;
+import java.util.List;
 import java.util.Random;
 
 public class AccountSteps {
@@ -27,8 +28,8 @@ public class AccountSteps {
 
     public DepositMoneyResponse deposit(Long accountId, Number amount) {
         DepositMoneyRequest request = DepositMoneyRequest.builder()
-                .id(accountId)
-                .balance(amount)
+                .accountId(accountId)
+                .amount(amount)
                 .build();
         return new ValidatedCrudRequester<DepositMoneyResponse>(
                 RequestSpecs.authAsUser(username, password),
@@ -39,8 +40,8 @@ public class AccountSteps {
 
     public void depositExpectingError(Long accountId, Number amount, ResponseSpecification errorSpec) {
         DepositMoneyRequest request = DepositMoneyRequest.builder()
-                .id(accountId)
-                .balance(amount)
+                .accountId(accountId)
+                .amount(amount)
                 .build();
         new ValidatedCrudRequester<DepositMoneyResponse>(
                 RequestSpecs.authAsUser(username, password),
@@ -51,8 +52,8 @@ public class AccountSteps {
 
     public void depositWithoutAuth(Long accountId, Number amount) {
         DepositMoneyRequest request = DepositMoneyRequest.builder()
-                .id(accountId)
-                .balance(amount)
+                .accountId(accountId)
+                .amount(amount)
                 .build();
         new ValidatedCrudRequester<DepositMoneyResponse>(
                 RequestSpecs.unauthSpec(),
@@ -127,4 +128,12 @@ public class AccountSteps {
     public static Number generateRandomTransferAmount() {
              return new Random().nextDouble(1.0, 10000.0);
          }
+
+    public List<Account> getAccounts() {
+        return new ValidatedCrudRequester<Account>(
+                RequestSpecs.authAsUser(username, password),
+                Endpoint.CUSTOMER_ACCOUNTS,
+                ResponseSpecs.ok()
+        ).getAll(Account.class);
+    }
 }

@@ -12,6 +12,6 @@ import java.util.List;
 public class CreateAccountResponse extends BaseModel{
     private long id;
     private String accountNumber;
-    private String balance;
-    private List<String> transactions;
+    private Number balance;
+    private List<Transaction> transactions;
 }
