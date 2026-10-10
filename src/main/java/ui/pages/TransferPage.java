@@ -3,6 +3,7 @@ package ui.pages;
 import com.codeborne.selenide.SelenideElement;
 import lombok.Getter;
 import org.openqa.selenium.Alert;
+import ui.elements.AmountInput;
 import static com.codeborne.selenide.Selectors.byText;
 import static com.codeborne.selenide.Selenide.$;
 import static com.codeborne.selenide.Selenide.switchTo;
@@ -13,9 +14,9 @@ public class TransferPage extends BasePage<TransferPage> {
     private SelenideElement accountSelect = $("select");
     private SelenideElement recipientName = $("[placeholder='Enter recipient name']");
     private SelenideElement recipientAccount = $("[placeholder='Enter recipient account number']");
-    private SelenideElement amountInput = $("[placeholder='Enter amount']");
     private SelenideElement confirmCheckbox = $("#confirmCheck");
     private SelenideElement sendButton = $(byText("🚀 Send Transfer"));
+    private AmountInput amountInput = new AmountInput($("[placeholder='Enter amount']"));
 
     @Override
     public String url() {
@@ -38,7 +39,8 @@ public class TransferPage extends BasePage<TransferPage> {
     }
 
     public TransferPage enterAmount(double amount) {
-        amountInput.setValue(String.valueOf(amount));
+        amountInput.setValue(amount);
+        amountInput.shouldHaveValue(amount);
         return this;
     }
 

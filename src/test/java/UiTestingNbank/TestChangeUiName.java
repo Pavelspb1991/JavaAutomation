@@ -1,21 +1,27 @@
 package UiTestingNbank;
 
 import api.models.CustomerData;
-import api.requests.steps.UserSteps;
+import common.annotations.Browsers;
+import common.annotations.UserSession;
+import common.storage.SessionStorage;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import ui.pages.BankAlert;
 import ui.pages.EditProfilePage;
 import ui.pages.LoginPage;
+import api.models.CreateUserRequest;
 
 public class TestChangeUiName extends BaseUiTest {
 
     @ParameterizedTest
+    @UserSession
+    @Browsers({"chrome"})
     @ValueSource(strings = {"A B", "Ab Cd", "Abcdefghijklmno Abcdefghijklmn"})
     public void changeUserNameTest(String validName) {
-        authAsUser(createdUserRequest.getUsername(),createdUserRequest.getPassword());
+        CreateUserRequest user = SessionStorage.getUser();
         new LoginPage()
-                .verifyLoginAndGoToProfile(createdUserRequest.getUsername());
+                .verifyLoginAndGoToProfile(user.getUsername());
+
         new EditProfilePage()
                 .changeName(validName)
                 .clickSave()
@@ -23,21 +29,19 @@ public class TestChangeUiName extends BaseUiTest {
                 .verifyNameDisplayed(validName)
                 .clearName();
 
-        UserSteps userSteps = new UserSteps(
-                createdUserRequest.getUsername(),
-                createdUserRequest.getPassword(),
-                createdUserResponse.getId()
-        );
-        CustomerData profile = userSteps.getProfile();
+        CustomerData profile = SessionStorage.getSteps().getProfile();
         assert profile.getName().equals(validName);
     }
 
     @ParameterizedTest
+    @UserSession
+    @Browsers({"chrome"})
     @ValueSource(strings = {"A", "AbCd", "John1 Doe", "John Doe1", "John1 Doe Jack", "Привет", ""})
     public void userCantChangeNameWithInvalidData(String invalidName) {
-        authAsUser(createdUserRequest.getUsername(),createdUserRequest.getPassword());
+        CreateUserRequest user = SessionStorage.getUser();
         new LoginPage()
-                .verifyLoginAndGoToProfile(createdUserRequest.getUsername());
+                .verifyLoginAndGoToProfile(user.getUsername());
+
         EditProfilePage editPage = new EditProfilePage();
         String originalName = editPage.getCurrentName();
         editPage.clearName()
