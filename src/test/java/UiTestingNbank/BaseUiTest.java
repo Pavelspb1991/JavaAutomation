@@ -31,6 +31,6 @@ public class BaseUiTest extends BaseTest {
     }
     @BeforeEach
     public void loginToUi() {
-        BasePage.authAsUser(SessionStorage.getUser());  // ← ЗДЕСЬ!
+        BasePage.authAsUser(SessionStorage.getUser());
     }
 }

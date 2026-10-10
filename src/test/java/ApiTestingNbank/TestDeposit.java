@@ -1,6 +1,10 @@
 package ApiTestingNbank;
 
+import api.dao.AccountDao;
+import api.dao.UserDao;
+import api.dao.comparison.DaoAndModelAssertions;
 import api.models.*;
+import api.requests.steps.DataBaseSteps;
 import common.annotations.UserSession;
 import common.extensions.UserSessionExtension;
 import common.storage.SessionStorage;
@@ -52,6 +56,9 @@ public class TestDeposit extends BaseTest {
         boolean transactionExists = afterAccount.getTransactions().stream()
                 .anyMatch(tx -> tx.getAmount().doubleValue() == amount);
         softly.assertThat(transactionExists).isTrue();
+
+        AccountDao accountDao = DataBaseSteps.getAccountByAccountNumber(account.getAccountNumber());
+        DaoAndModelAssertions.assertThat(response, accountDao).match();
     }
 
     @ParameterizedTest

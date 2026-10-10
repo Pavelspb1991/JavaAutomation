@@ -33,7 +33,6 @@ public class UserSessionExtension implements BeforeEachCallback {
             SessionStorage.addUsers(users, responses);
 
             int authAsUser = annotation.auth();
-            //   BasePage.authAsUser(SessionStorage.getUser(authAsUser + 1));
         }
     }
 }

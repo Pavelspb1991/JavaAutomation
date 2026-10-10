@@ -11,7 +11,7 @@ import java.util.List;
 @Builder
 
 public class DepositMoneyResponse extends BaseModel {
-    private int id;
+    private long id;
     private String accountNumber;
     private Number balance;
     private List<Transaction> transactions;

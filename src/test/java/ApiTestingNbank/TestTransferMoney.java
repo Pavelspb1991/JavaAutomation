@@ -1,6 +1,9 @@
 package ApiTestingNbank;
 
+import api.dao.AccountDao;
+import api.dao.comparison.DaoAndModelAssertions;
 import api.models.*;
+import api.requests.steps.DataBaseSteps;
 import common.annotations.UserSession;
 import common.extensions.UserSessionExtension;
 import common.storage.SessionStorage;
@@ -75,6 +78,14 @@ public class TestTransferMoney extends BaseTest {
         softly.assertThat(senderAfter.getBalance().doubleValue())
                 .isEqualTo(senderBalanceBefore.doubleValue() - amount);
         softly.assertThat(receiverAfter.getBalance().doubleValue())
+                .isEqualTo(receiverBalanceBefore.doubleValue() + amount);
+
+        AccountDao senderDao = DataBaseSteps.getAccountByAccountNumber(senderAccount.getAccountNumber());
+        AccountDao receiverDao = DataBaseSteps.getAccountByAccountNumber(receiverAccount.getAccountNumber());
+
+        softly.assertThat(senderDao.getBalance())
+                .isEqualTo(senderBalanceBefore.doubleValue() - amount);
+        softly.assertThat(receiverDao.getBalance())
                 .isEqualTo(receiverBalanceBefore.doubleValue() + amount);
     }
 

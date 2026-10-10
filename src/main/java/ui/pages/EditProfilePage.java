@@ -71,9 +71,6 @@ public class EditProfilePage extends BasePage<EditProfilePage> {
         String alertText = alert.getText();
         alert.accept();
 
-        // Фронт в негативном сценарии отдаёт alert с объектом, а не строкой —
-        // браузер показывает "[object Object]". Это известный баг фронта,
-        // зафиксирован в тесте как фактическое поведение.
         boolean isKnownFrontendBug = alertText.equals("[object Object]");
         boolean isExpectedMessage =
                 alertText.contains(BankAlert.NAME_MUST_CONTAIN_TWO_WORDS.getMessage()) ||
