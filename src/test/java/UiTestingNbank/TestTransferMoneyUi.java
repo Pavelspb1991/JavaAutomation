@@ -5,10 +5,13 @@ import api.requests.steps.AccountSteps;
 import common.annotations.Browsers;
 import common.annotations.UserSession;
 import common.storage.SessionStorage;
+import common.utils.RepeatUtils;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import ui.pages.UserDashboard;
 import java.util.List;
+
+import static common.utils.Constants.MAX_DEPOSIT_AMOUNT;
 
 public class TestTransferMoneyUi extends BaseUiTest {
 
@@ -33,9 +36,9 @@ public class TestTransferMoneyUi extends BaseUiTest {
                 .filter(a -> a.getAccountNumber().contains(receiverAccount))
                 .findFirst().orElseThrow();
 
-        for (int i = 0; i < 10; i++) {
-            steps.deposit(sender.getId(), 5000);
-        }
+        RepeatUtils.repeat(10, () -> {
+            steps.deposit(sender.getId(), MAX_DEPOSIT_AMOUNT);
+        });
 
         dashboard
                 .goToTransfer()
@@ -71,9 +74,9 @@ public class TestTransferMoneyUi extends BaseUiTest {
                 .filter(a -> a.getAccountNumber().contains(senderAccount))
                 .findFirst().orElseThrow();
 
-        for (int i = 0; i < 10; i++) {
-            steps.deposit(sender.getId(), 5000);
-        }
+        RepeatUtils.repeat(10, () -> {
+            steps.deposit(sender.getId(), MAX_DEPOSIT_AMOUNT);
+        });
 
         dashboard
                 .goToTransfer()

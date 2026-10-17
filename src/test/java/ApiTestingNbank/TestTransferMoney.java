@@ -7,6 +7,7 @@ import api.requests.steps.DataBaseSteps;
 import common.annotations.UserSession;
 import common.extensions.UserSessionExtension;
 import common.storage.SessionStorage;
+import common.utils.RepeatUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -16,6 +17,8 @@ import api.requests.steps.AccountSteps;
 import api.specs.ResponseSpecs;
 import java.util.List;
 import java.util.stream.Stream;
+
+import static common.utils.Constants.MAX_DEPOSIT_AMOUNT;
 
 @ExtendWith(UserSessionExtension.class)
 public class TestTransferMoney extends BaseTest {
@@ -52,9 +55,10 @@ public class TestTransferMoney extends BaseTest {
         CreateAccountResponse senderAccount = steps.createAccount();
         CreateAccountResponse receiverAccount = steps.createAccount();
 
-        for (int i = 0; i < 10; i++) {
-            steps.deposit(senderAccount.getId(), 5000);
-        }
+
+        RepeatUtils.repeat(10, () -> {
+            steps.deposit(senderAccount.getId(), MAX_DEPOSIT_AMOUNT);
+        });
 
         List<Account> accounts = steps.getAccounts();
         Account senderBefore = findAccountById(accounts, senderAccount.getId());
