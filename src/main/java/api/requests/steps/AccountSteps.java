@@ -120,6 +120,19 @@ public class AccountSteps {
                 errorSpec
         ).postExpectingErrorWithRawBody(rawBody);
     }
+    public TransferResponse transferWithFraudCheck(Long senderId, Long receiverId, Number amount) {
+        TransferMoneyRequest request = TransferMoneyRequest.builder()
+                .senderAccountId(senderId)
+                .receiverAccountId(receiverId)
+                .amount(amount)
+                .build();
+
+        return new ValidatedCrudRequester<TransferResponse>(
+                RequestSpecs.authAsUser(username, password),
+                Endpoint.TRANSFER_WITH_FRAUD_CHECK,
+                ResponseSpecs.ok()
+        ).post(request);
+    }
 
     public static Long generateNonExistentAccountId() {
         return new Random().nextLong(1000000000L, 9999999999L);

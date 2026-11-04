@@ -54,6 +54,11 @@ public enum Endpoint {
             "/accounts/transfer",
             TransferMoneyRequest.class,
             TransferMoneyResponse.class
+    ),
+    TRANSFER_WITH_FRAUD_CHECK(
+            "/accounts/transfer-with-fraud-check",
+            TransferMoneyRequest.class,
+            TransferResponse.class
     );
 
     private final String url;
